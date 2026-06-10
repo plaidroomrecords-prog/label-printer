@@ -17,50 +17,46 @@
     #error-msg { color: red; font-size: 13px; margin-top: 12px; }
     .labels-wrapper { margin-top: 24px; }
 
-    /* ── Label shell ── */
     .label {
       width: 3.5in;
       height: 1.125in;
       background: white;
       border: 1px solid #ccc;
-      display: grid;
-      grid-template-rows: auto 1fr;
-      padding: 0.07in 0.08in 0.06in 0.08in;
+      display: flex;
+      flex-direction: column;
+      padding: 0.05in 0.07in 0.04in 0.07in;
       margin-bottom: 12px;
       overflow: hidden;
     }
 
-    /* ── Top row: title + subtitle ── */
     .label-top {
       display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-shrink: 0;
     }
+    .label-text-block { flex: 1; min-width: 0; padding-right: 4px; }
     .label-title {
-      font-size: 10pt;
-      font-weight: normal;
+      font-size: 8.5pt;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      line-height: 1.25;
-      letter-spacing: 0.02em;
+      line-height: 1.2;
     }
-    .label-subtitle {
-      font-size: 8pt;
-      font-weight: normal;
+    .label-sku {
+      font-size: 6.5pt;
+      color: #333;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      line-height: 1.25;
-      letter-spacing: 0.02em;
+      line-height: 1.2;
       margin-top: 1px;
     }
 
-    /* ── Bottom row: barcode left, logo+price right ── */
     .label-bottom {
       display: flex;
-      align-items: flex-end;
       justify-content: space-between;
+      align-items: flex-end;
       margin-top: auto;
     }
 
@@ -68,35 +64,33 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      flex: 0 0 auto;
     }
-    .label-barcode-area svg {
-      display: block;
-    }
+    .label-barcode-area svg { display: block; }
     .label-barcode-number {
       font-size: 6pt;
-      margin-top: 2px;
+      margin-top: 1px;
       text-align: center;
       letter-spacing: 0.5px;
     }
 
+    /* Logo + price side by side, bottom right */
     .label-right {
       display: flex;
       align-items: center;
-      gap: 0.08in;
-      flex-shrink: 0;
+      gap: 6px;
       padding-bottom: 2px;
+      flex-shrink: 0;
     }
     .label-logo {
-      width: 0.48in;
-      height: 0.48in;
+      width: 0.52in;
+      height: 0.52in;
       object-fit: contain;
     }
     .label-price {
-      font-size: 18pt;
-      font-weight: normal;
-      letter-spacing: 0.01em;
-      white-space: nowrap;
+      font-size: 15pt;
+      font-weight: bold;
+      text-align: right;
+      line-height: 1;
     }
 
     @media print {
@@ -127,7 +121,6 @@
 <div class="labels-wrapper" id="labels-wrapper"></div>
 
 <script>
-// ── Code128B encoder ──────────────────────────────────────────────────────────
 const CODE128B_PATTERNS = [
   0b11011001100,0b11001101100,0b11001100110,0b10010011000,
   0b10010001100,0b10001001100,0b10011001000,0b10011000100,
@@ -167,7 +160,6 @@ function encodeCode128B(text) {
   let check = 104;
   for (let i = 0; i < chars.length; i++) check += chars[i] * (i + 1);
   check %= 103;
-
   const syms = [START_B, ...chars.map(c => CODE128B_PATTERNS[c]), CODE128B_PATTERNS[check]];
   const bars = [];
   for (const s of syms) for (let b = 10; b >= 0; b--) bars.push((s >> b) & 1);
@@ -189,7 +181,6 @@ function buildBarcodeSVG(text, widthPx, heightPx) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">${rects}</svg>`;
 }
 
-// ── Label rendering ───────────────────────────────────────────────────────────
 const LOGO_URL = 'https://shopify-staged-uploads.storage.googleapis.com/tmp/14874550/files/198e70fd-66b1-4e28-a48b-6a13ebd1d515/PRRLogos-03.png';
 
 function esc(str) {
@@ -197,33 +188,28 @@ function esc(str) {
 }
 
 function renderLabel(item) {
-  // Barcode: ~1.9in wide × 0.33in tall at 96dpi
-  const barcodeSVG = buildBarcodeSVG(item.barcode, 182, 32);
-  const title    = esc(item.title || '');
-  const subtitle = esc(item.sku   || '');
-  const price    = esc(item.price || '');
-  const barcodeNum = esc(item.barcode);
-
+  const barcodeSVG = buildBarcodeSVG(item.barcode, 160, 26);
   return `
 <div class="label">
   <div class="label-top">
-    <div class="label-title">${title}</div>
-    <div class="label-subtitle">${subtitle}</div>
+    <div class="label-text-block">
+      <div class="label-title">${esc(item.title || '')}</div>
+      <div class="label-sku">${esc(item.sku || '')}</div>
+    </div>
   </div>
   <div class="label-bottom">
     <div class="label-barcode-area">
       ${barcodeSVG}
-      <div class="label-barcode-number">${barcodeNum}</div>
+      <div class="label-barcode-number">${esc(item.barcode)}</div>
     </div>
     <div class="label-right">
       <img class="label-logo" src="${LOGO_URL}" alt="Plaid Room Records">
-      <div class="label-price">${price}</div>
+      <div class="label-price">${esc(item.price || '')}</div>
     </div>
   </div>
 </div>`;
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
 (function () {
   const params  = new URLSearchParams(window.location.search);
   const raw     = params.get('labels');
