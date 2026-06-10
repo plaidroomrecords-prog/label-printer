@@ -64,7 +64,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      margin-left: 0.12in;
+      margin-left: 0.18in;
     }
     .label-barcode-area svg { display: block; }
     .label-barcode-number {
@@ -72,6 +72,7 @@
       margin-top: 1px;
       text-align: center;
       letter-spacing: 0.5px;
+      text-transform: uppercase;
     }
 
     .label-right {
@@ -188,7 +189,8 @@ function esc(str) {
 }
 
 function renderLabel(item) {
-  const barcodeSVG = buildBarcodeSVG(item.barcode, 110, 26);
+  const barcodeSVG = buildBarcodeSVG(item.barcode, 97, 26);
+  const barcodeDisplay = esc(item.barcode.toUpperCase());
   return `
 <div class="label">
   <div class="label-top">
@@ -200,7 +202,7 @@ function renderLabel(item) {
   <div class="label-bottom">
     <div class="label-barcode-area">
       ${barcodeSVG}
-      <div class="label-barcode-number">${esc(item.barcode)}</div>
+      <div class="label-barcode-number">${barcodeDisplay}</div>
     </div>
     <div class="label-right">
       <img class="label-logo" src="${LOGO_URL}" alt="Plaid Room Records">
