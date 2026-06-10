@@ -189,7 +189,7 @@ function esc(str) {
 }
 
 function renderLabel(item) {
-  const barcodeSVG = buildBarcodeSVG(item.barcode, 97, 26);
+  const barcodeSVG = buildBarcodeSVG(item.barcode, 125, 26);
   const barcodeDisplay = esc(item.barcode.toUpperCase());
   return `
 <div class="label">
