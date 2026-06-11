@@ -179,7 +179,7 @@ function buildBarcodeSVG(text, widthPx, heightPx) {
     if (b) rects += `<rect x="${x.toFixed(2)}" y="0" width="${mw.toFixed(2)}" height="${heightPx}" fill="black"/>`;
     x += mw;
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">${rects}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="125" height="26" viewBox="0 0 ${widthPx} ${heightPx}">${rects}</svg>`;
 }
 
 const LOGO_URL = 'https://shopify-staged-uploads.storage.googleapis.com/tmp/14874550/files/198e70fd-66b1-4e28-a48b-6a13ebd1d515/PRRLogos-03.png';
@@ -189,7 +189,7 @@ function esc(str) {
 }
 
 function renderLabel(item) {
-  const barcodeSVG = buildBarcodeSVG(item.barcode, 125, 26);
+  const barcodeSVG = buildBarcodeSVG(item.barcode, 500, 104);
   const barcodeDisplay = esc(item.barcode.toUpperCase());
   return `
 <div class="label">
