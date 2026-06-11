@@ -172,14 +172,16 @@ function encodeCode128B(text) {
 function buildBarcodeSVG(text, widthPx, heightPx) {
   const bars = encodeCode128B(text);
   if (!bars) return '<svg></svg>';
-  const mw = widthPx / bars.length;
+  // Each bar is exactly 1 unit wide — no fractions
+  const totalUnits = bars.length;
   let rects = '';
-  let x = 0;
-  for (const b of bars) {
-    if (b) rects += `<rect x="${x.toFixed(2)}" y="0" width="${mw.toFixed(2)}" height="${heightPx}" fill="black"/>`;
-    x += mw;
+  for (let i = 0; i < bars.length; i++) {
+    if (bars[i]) {
+      rects += `<rect x="${i}" y="0" width="1" height="${heightPx}" fill="black" shape-rendering="crispEdges"/>`;
+    }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="125" height="26" viewBox="0 0 ${widthPx} ${heightPx}">${rects}</svg>`;
+  // viewBox uses integer units; width/height controls display size
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${totalUnits} ${heightPx}" shape-rendering="crispEdges">${rects}</svg>`;
 }
 
 const LOGO_URL = 'https://shopify-staged-uploads.storage.googleapis.com/tmp/14874550/files/198e70fd-66b1-4e28-a48b-6a13ebd1d515/PRRLogos-03.png';
@@ -189,7 +191,7 @@ function esc(str) {
 }
 
 function renderLabel(item) {
-  const barcodeSVG = buildBarcodeSVG(item.barcode, 500, 104);
+  const barcodeSVG = buildBarcodeSVG(item.barcode, 125, 26);
   const barcodeDisplay = esc(item.barcode.toUpperCase());
   return `
 <div class="label">
