@@ -66,7 +66,7 @@
       align-items: center;
       margin-left: 0.18in;
     }
-    .label-barcode-area svg { display: block; }
+    .label-barcode-area img { display: block; }
     .label-barcode-number {
       font-size: 6pt;
       margin-top: 1px;
@@ -169,19 +169,26 @@ function encodeCode128B(text) {
   return bars;
 }
 
-function buildBarcodeSVG(text, widthPx, heightPx) {
+function buildBarcodeDataURL(text, widthPx, heightPx) {
   const bars = encodeCode128B(text);
-  if (!bars) return '<svg></svg>';
-  // Each bar is exactly 1 unit wide — no fractions
-  const totalUnits = bars.length;
-  let rects = '';
+  if (!bars) return null;
+  const canvas = document.createElement('canvas');
+  const scale = 3;
+  canvas.width = widthPx * scale;
+  canvas.height = heightPx * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'black';
+  const barWidth = (widthPx * scale) / bars.length;
   for (let i = 0; i < bars.length; i++) {
     if (bars[i]) {
-      rects += `<rect x="${i}" y="0" width="1" height="${heightPx}" fill="black" shape-rendering="crispEdges"/>`;
+      const x = Math.round(i * barWidth);
+      const nextX = Math.round((i + 1) * barWidth);
+      ctx.fillRect(x, 0, nextX - x, canvas.height);
     }
   }
-  // viewBox uses integer units; width/height controls display size
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${totalUnits} ${heightPx}" shape-rendering="crispEdges">${rects}</svg>`;
+  return canvas.toDataURL('image/png');
 }
 
 const LOGO_URL = 'https://shopify-staged-uploads.storage.googleapis.com/tmp/14874550/files/198e70fd-66b1-4e28-a48b-6a13ebd1d515/PRRLogos-03.png';
@@ -191,7 +198,10 @@ function esc(str) {
 }
 
 function renderLabel(item) {
-  const barcodeSVG = buildBarcodeSVG(item.barcode, 125, 26);
+  const barcodeDataURL = buildBarcodeDataURL(item.barcode, 125, 26);
+  const barcodeImg = barcodeDataURL
+    ? `<img src="${barcodeDataURL}" width="125" height="26" style="display:block;image-rendering:pixelated;">`
+    : '';
   const barcodeDisplay = esc(item.barcode.toUpperCase());
   return `
 <div class="label">
@@ -203,7 +213,7 @@ function renderLabel(item) {
   </div>
   <div class="label-bottom">
     <div class="label-barcode-area">
-      ${barcodeSVG}
+      ${barcodeImg}
       <div class="label-barcode-number">${barcodeDisplay}</div>
     </div>
     <div class="label-right">
