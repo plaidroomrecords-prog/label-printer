@@ -197,7 +197,7 @@ function esc(str) {
 function renderLabel(item) {
   const barcodeDataURL = buildBarcodeDataURL(item.barcode, 26);
   const barcodeImg = barcodeDataURL
-    ? `<img src="${barcodeDataURL}" height="26" style="display:block;image-rendering:crisp-edges;">`
+    ? `<img src="${barcodeDataURL}" width="90" height="26" style="display:block;image-rendering:crisp-edges;">`
     : '';
   const barcodeDisplay = esc(item.barcode.toUpperCase());
   return `
