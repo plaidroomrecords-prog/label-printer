@@ -169,24 +169,21 @@ function encodeCode128B(text) {
   return bars;
 }
 
-function buildBarcodeDataURL(text, widthPx, heightPx) {
+function buildBarcodeDataURL(text, heightPx) {
   const bars = encodeCode128B(text);
   if (!bars) return null;
   const canvas = document.createElement('canvas');
-  const scale = 3;
-  canvas.width = widthPx * scale;
+  // 1 canvas pixel per bar module, scaled up only for anti-aliasing headroom.
+  // This keeps each bar exactly 1px wide so upscaling stays crisp.
+  const scale = 2;
+  canvas.width = bars.length * scale;
   canvas.height = heightPx * scale;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = 'black';
-  const barWidth = (widthPx * scale) / bars.length;
   for (let i = 0; i < bars.length; i++) {
-    if (bars[i]) {
-      const x = Math.round(i * barWidth);
-      const nextX = Math.round((i + 1) * barWidth);
-      ctx.fillRect(x, 0, nextX - x, canvas.height);
-    }
+    if (bars[i]) ctx.fillRect(i * scale, 0, scale, canvas.height);
   }
   return canvas.toDataURL('image/png');
 }
@@ -198,9 +195,9 @@ function esc(str) {
 }
 
 function renderLabel(item) {
-  const barcodeDataURL = buildBarcodeDataURL(item.barcode, 125, 26);
+  const barcodeDataURL = buildBarcodeDataURL(item.barcode, 26);
   const barcodeImg = barcodeDataURL
-    ? `<img src="${barcodeDataURL}" width="125" height="26" style="display:block;image-rendering:pixelated;">`
+    ? `<img src="${barcodeDataURL}" height="26" style="display:block;image-rendering:crisp-edges;">`
     : '';
   const barcodeDisplay = esc(item.barcode.toUpperCase());
   return `
