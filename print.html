@@ -173,9 +173,7 @@ function buildBarcodeDataURL(text, heightPx) {
   const bars = encodeCode128B(text);
   if (!bars) return null;
   const canvas = document.createElement('canvas');
-  // 1 canvas pixel per bar module, scaled up only for anti-aliasing headroom.
-  // This keeps each bar exactly 1px wide so upscaling stays crisp.
-  const scale = 2;
+  const scale = 2; // 2 canvas px per bar for HiDPI crispness
   canvas.width = bars.length * scale;
   canvas.height = heightPx * scale;
   const ctx = canvas.getContext('2d');
@@ -185,7 +183,7 @@ function buildBarcodeDataURL(text, heightPx) {
   for (let i = 0; i < bars.length; i++) {
     if (bars[i]) ctx.fillRect(i * scale, 0, scale, canvas.height);
   }
-  return canvas.toDataURL('image/png');
+  return { dataUrl: canvas.toDataURL('image/png'), naturalWidth: bars.length };
 }
 
 const LOGO_URL = 'https://plaid-room-dashboard-441088933255.us-central1.run.app/plaid-room-logo.png';
@@ -195,9 +193,9 @@ function esc(str) {
 }
 
 function renderLabel(item) {
-  const barcodeDataURL = buildBarcodeDataURL(item.barcode, 26);
-  const barcodeImg = barcodeDataURL
-    ? `<img src="${barcodeDataURL}" width="105" height="26" style="display:block;image-rendering:crisp-edges;">`
+  const barcode = buildBarcodeDataURL(item.barcode, 38);
+  const barcodeImg = barcode
+    ? `<img src="${barcode.dataUrl}" width="${barcode.naturalWidth}" height="38" style="display:block;image-rendering:crisp-edges;">`
     : '';
   const barcodeDisplay = esc(item.barcode.toUpperCase());
   return `
