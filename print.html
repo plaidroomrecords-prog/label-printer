@@ -5,245 +5,171 @@
   <title>Plaid Room Records — Print Labels</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #f0f0f0; font-family: Futura, 'Century Gothic', 'Trebuchet MS', sans-serif; }
-
-    #screen-ui { padding: 20px; }
-    #screen-ui h1 { font-size: 18px; margin-bottom: 8px; }
-    #screen-ui p { font-size: 13px; color: #555; margin-bottom: 16px; }
-    #print-btn {
-      padding: 10px 20px; background: #000; color: #fff;
-      border: none; font-size: 14px; cursor: pointer; border-radius: 4px;
-    }
-    #error-msg { color: red; font-size: 13px; margin-top: 12px; }
-    .labels-wrapper { margin-top: 24px; }
-
-    .label {
-      width: 3.5in;
-      height: 1.125in;
-      background: white;
-      border: 1px solid #ccc;
-      display: flex;
-      flex-direction: column;
-      padding: 0.12in 0.23in 0.10in 0.23in;
-      margin-bottom: 12px;
-      overflow: hidden;
-    }
-
-    .label-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      flex-shrink: 0;
-    }
-    .label-text-block { flex: 1; min-width: 0; padding-right: 4px; }
-    .label-title {
-      font-size: 8.5pt;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.2;
-    }
-    .label-sku {
-      font-size: 6.5pt;
-      color: #333;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.2;
-      margin-top: 1px;
-    }
-
-    .label-bottom {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      margin-top: auto;
-    }
-
-    .label-barcode-area {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-left: 0.18in;
-    }
-    .label-barcode-area img { display: block; }
-    .label-barcode-number {
-      font-size: 6pt;
-      margin-top: 1px;
-      text-align: center;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-
-    .label-right {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding-bottom: 2px;
-      flex-shrink: 0;
-    }
-    .label-logo {
-      width: 0.52in;
-      height: 0.52in;
-      object-fit: contain;
-    }
-    .label-price {
-      font-size: 15pt;
-      font-weight: normal;
-      text-align: right;
-      line-height: 1;
-    }
-
-    @media print {
-      @page { size: 3.5in 1.125in; margin: 0; }
-      body { background: white; }
-      #screen-ui { display: none; }
-      .labels-wrapper { margin: 0; }
-      .label {
-        border: none;
-        margin: 0;
-        page-break-after: always;
-        break-after: page;
-        width: 3.5in;
-        height: 1.125in;
-      }
-    }
+    body { background: #f0f0f0; font-family: -apple-system, sans-serif; padding: 24px; }
+    h1 { font-size: 18px; margin-bottom: 8px; }
+    #status { font-size: 13px; margin-bottom: 16px; color: #333; }
+    #status.error { color: red; }
+    #status.ok { color: #007155; }
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+    select { padding: 8px 12px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; background: white; }
+    button { padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+    #print-btn { background: #000; color: #fff; }
+    #print-btn:disabled { background: #999; cursor: not-allowed; }
+    #debug { font-size: 11px; color: #888; margin-bottom: 12px; word-break: break-all; white-space: pre-wrap; }
+    .label-item { background: white; border: 1px solid #e1e3e5; border-radius: 6px; padding: 10px 14px; font-size: 13px; display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .label-item .title { font-weight: 600; }
+    .label-item .meta { color: #666; font-size: 12px; }
   </style>
 </head>
 <body>
-
-<div id="screen-ui">
-  <h1>Plaid Room Records — Label Printer</h1>
-  <p id="label-count">Loading labels…</p>
-  <button id="print-btn" onclick="window.print()">Print Labels</button>
-  <div id="error-msg"></div>
+<h1>Plaid Room Records — Label Printer</h1>
+<div id="status">Connecting to DYMO service…</div>
+<div id="debug"></div>
+<div class="controls">
+  <select id="printer-select"><option>Loading printers…</option></select>
+  <button id="print-btn" disabled>Print All Labels</button>
 </div>
-
-<div class="labels-wrapper" id="labels-wrapper"></div>
+<div id="label-list"></div>
 
 <script>
-const CODE128B_PATTERNS = [
-  0b11011001100,0b11001101100,0b11001100110,0b10010011000,
-  0b10010001100,0b10001001100,0b10011001000,0b10011000100,
-  0b10001100100,0b11001001000,0b11001000100,0b11000100100,
-  0b10110011100,0b10011011100,0b10011001110,0b10111001100,
-  0b10011101100,0b10011100110,0b11001110010,0b11001011100,
-  0b11001001110,0b11011100100,0b11001110100,0b11101101110,
-  0b11101001100,0b11100101100,0b11100100110,0b11101100100,
-  0b11100110100,0b11100110010,0b11011011000,0b11011000110,
-  0b11000110110,0b10100011000,0b10001011000,0b10001000110,
-  0b10110001000,0b10001101000,0b10001100010,0b11010001000,
-  0b11000101000,0b11000100010,0b10110111000,0b10110001110,
-  0b10001101110,0b10111011000,0b10111000110,0b10001110110,
-  0b11101110110,0b11010001110,0b11000101110,0b11011101000,
-  0b11011100010,0b11011101110,0b11101011000,0b11101000110,
-  0b11100010110,0b11101101000,0b11101100010,0b11100011010,
-  0b11101111010,0b11001000010,0b11110001010,0b10100110000,
-  0b10100001100,0b10010110000,0b10010000110,0b10000101100,
-  0b10000100110,0b10110010000,0b10110000100,0b10011010000,
-  0b10011000010,0b10000110100,0b10000110010,0b11000010010,
-  0b11001010000,0b11110111010,0b11000010100,0b10001111010,
-  0b10100111100,0b10010111100,0b10010011110,0b10111100100,
-  0b10011110100,0b10011110010,0b11110100100,0b11110010100,
-  0b11110010010,0b11011011110,0b11011110110,0b11110110110,
-  0b10101111000,0b10100011110,0b10001011110,
-];
-const START_B  = 0b11010010000;
-const STOP_PAT = 0b1100011101011;
+const DYMO_HOST = '';
+const statusEl = document.getElementById('status');
+const debugEl  = document.getElementById('debug');
+const printerSelect = document.getElementById('printer-select');
+const printBtn = document.getElementById('print-btn');
 
-function encodeCode128B(text) {
-  const chars = [];
-  for (let i = 0; i < text.length; i++) {
-    const c = text.charCodeAt(i);
-    if (c < 32 || c > 126) return null;
-    chars.push(c - 32);
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function dbg(msg) { debugEl.textContent += msg + '\n'; }
+
+// Parse labels from URL
+const params = new URLSearchParams(window.location.search);
+let items = [];
+try { items = JSON.parse(decodeURIComponent(params.get('labels') || '[]')); } catch(e) {}
+
+document.getElementById('label-list').innerHTML = items.map(item => `
+  <div class="label-item">
+    <div><div class="title">${esc(item.title)}</div><div class="meta">${esc(item.sku)} · ${esc(item.barcode)}</div></div>
+    <div style="font-size:16px;font-weight:700;">${esc(item.price)}</div>
+  </div>`).join('');
+
+async function dymoGet(path) {
+  const r = await fetch(DYMO_HOST + path, {
+    method: 'GET',
+    headers: { 'Content-Type': 'text/xml' },
+  });
+  return r.text();
+}
+
+async function dymoPost(path, bodyParams) {
+  const body = new URLSearchParams(bodyParams);
+  const r = await fetch(DYMO_HOST + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  return r.text();
+}
+
+// Parse printer names from DYMO XML response
+function parsePrinters(xml) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  return Array.from(doc.querySelectorAll('LabelWriterPrinter')).map(p => ({
+    name: p.querySelector('Name')?.textContent || '',
+    type: 'LabelWriterPrinter',
+  }));
+}
+
+// Set a variable field value in the label XML string
+function setLabelField(xml, fieldName, value) {
+  // Replace the variable object's text node
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  const objs = doc.querySelectorAll('ObjectInfo');
+  for (const obj of objs) {
+    const nameEl = obj.querySelector('Name');
+    if (!nameEl || nameEl.textContent !== fieldName) continue;
+    // Barcode object
+    const textEl = obj.querySelector('BarcodeObject > Text');
+    if (textEl) { textEl.textContent = value; continue; }
+    // Text object
+    const strEl = obj.querySelector('TextObject StyledText Element String');
+    if (strEl) { strEl.textContent = value; }
   }
-  let check = 104;
-  for (let i = 0; i < chars.length; i++) check += chars[i] * (i + 1);
-  check %= 103;
-  const syms = [START_B, ...chars.map(c => CODE128B_PATTERNS[c]), CODE128B_PATTERNS[check]];
-  const bars = [];
-  for (const s of syms) for (let b = 10; b >= 0; b--) bars.push((s >> b) & 1);
-  for (let b = 12; b >= 0; b--) bars.push((STOP_PAT >> b) & 1);
-  bars.push(1); bars.push(1);
-  return bars;
+  return new XMLSerializer().serializeToString(doc);
 }
 
-function buildBarcodeDataURL(text, heightPx) {
-  const bars = encodeCode128B(text);
-  if (!bars) return null;
-  const canvas = document.createElement('canvas');
-  const scale = 2; // 2 canvas px per bar for HiDPI crispness
-  canvas.width = bars.length * scale;
-  canvas.height = heightPx * scale;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'white';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = 'black';
-  for (let i = 0; i < bars.length; i++) {
-    if (bars[i]) ctx.fillRect(i * scale, 0, scale, canvas.height);
-  }
-  return { dataUrl: canvas.toDataURL('image/png'), naturalWidth: bars.length };
-}
-
-const LOGO_URL = 'https://plaid-room-dashboard-441088933255.us-central1.run.app/plaid-room-logo.png';
-
-function esc(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function renderLabel(item) {
-  const barcode = buildBarcodeDataURL(item.barcode, 38);
-  const barcodeImg = barcode
-    ? `<img src="${barcode.dataUrl}" width="${barcode.naturalWidth}" height="38" style="display:block;image-rendering:crisp-edges;">`
-    : '';
-  const barcodeDisplay = esc(item.barcode.toUpperCase());
-  return `
-<div class="label">
-  <div class="label-top">
-    <div class="label-text-block">
-      <div class="label-title">${esc(item.title || '')}</div>
-      <div class="label-sku">${esc(item.sku || '')}</div>
-    </div>
-  </div>
-  <div class="label-bottom">
-    <div class="label-barcode-area">
-      ${barcodeImg}
-      <div class="label-barcode-number">${barcodeDisplay}</div>
-    </div>
-    <div class="label-right">
-      <img class="label-logo" src="${LOGO_URL}" alt="Plaid Room Records">
-      <div class="label-price">${esc(item.price || '')}</div>
-    </div>
-  </div>
-</div>`;
-}
-
-(function () {
-  const params  = new URLSearchParams(window.location.search);
-  const raw     = params.get('labels');
-  const errorEl = document.getElementById('error-msg');
-  const countEl = document.getElementById('label-count');
-  const wrapper = document.getElementById('labels-wrapper');
-
-  if (!raw) {
-    errorEl.textContent = 'No label data found in URL. Open this page from the Barcode Reprint tab in Plaid Room Utilities.';
-    countEl.textContent = '0 labels';
-    return;
-  }
-  let items;
-  try { items = JSON.parse(decodeURIComponent(raw)); }
-  catch (e) { errorEl.textContent = 'Could not parse label data: ' + e.message; countEl.textContent = '0 labels'; return; }
-
-  if (!Array.isArray(items) || items.length === 0) {
-    errorEl.textContent = 'No labels to print.';
-    countEl.textContent = '0 labels';
+window.addEventListener('load', async () => {
+  // Step 1: get printers
+  let printersXml;
+  try {
+    printersXml = await dymoGet('/dymo-api/DYMO/DLS/Printing/GetPrinters');
+    dbg('GetPrinters response length: ' + printersXml.length);
+    dbg(printersXml.slice(0, 500));
+  } catch(e) {
+    statusEl.className = 'error';
+    statusEl.textContent = 'Cannot reach DYMO service at port 41951: ' + e.message;
+    dbg('fetch error: ' + e);
     return;
   }
 
-  countEl.textContent = `${items.length} label${items.length === 1 ? '' : 's'} ready — click Print Labels or Ctrl+P / Cmd+P`;
-  wrapper.innerHTML = items.map(renderLabel).join('');
-})();
+  const printers = parsePrinters(printersXml);
+  dbg('Parsed printers: ' + JSON.stringify(printers));
+
+  if (printers.length === 0) {
+    statusEl.className = 'error';
+    statusEl.textContent = 'No LabelWriter printers found. See debug info below.';
+    return;
+  }
+
+  printerSelect.innerHTML = printers.map(p =>
+    `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+  printBtn.disabled = items.length === 0;
+  statusEl.className = 'ok';
+  statusEl.textContent = `Ready — ${items.length} label${items.length === 1 ? '' : 's'} queued`;
+
+  // Step 2: load label template
+  let labelXml;
+  try {
+    const resp = await fetch('./plaid-room.label');
+    labelXml = await resp.text();
+    dbg('Label template loaded: ' + labelXml.length + ' bytes');
+  } catch(e) {
+    statusEl.className = 'error';
+    statusEl.textContent = 'Could not load plaid-room.label: ' + e.message;
+    return;
+  }
+
+  printBtn.addEventListener('click', async () => {
+    const printerName = printerSelect.value;
+    printBtn.disabled = true;
+    printBtn.textContent = 'Printing…';
+    try {
+      for (const item of items) {
+        let xml = labelXml;
+        xml = setLabelField(xml, 'barcode', String(item.barcode));
+        xml = setLabelField(xml, 'product_title', String(item.title || ''));
+        xml = setLabelField(xml, 'sku', String(item.sku || ''));
+        xml = setLabelField(xml, 'price', String(item.price || ''));
+        const result = await dymoPost('/dymo-api/DYMO/DLS/Printing/PrintLabel', {
+          printerName,
+          printParamsXml: '<LabelWriterPrintParams><Copies>1</Copies></LabelWriterPrintParams>',
+          labelXml: xml,
+          labelSetXml: '<LabelSet></LabelSet>',
+        });
+        dbg('Print result: ' + result);
+      }
+      statusEl.textContent = `✓ Sent ${items.length} label${items.length === 1 ? '' : 's'} to ${printerName}`;
+      statusEl.className = 'ok';
+    } catch(e) {
+      statusEl.className = 'error';
+      statusEl.textContent = 'Print error: ' + e.message;
+    } finally {
+      printBtn.disabled = false;
+      printBtn.textContent = 'Print All Labels';
+    }
+  });
+});
 </script>
 </body>
 </html>
