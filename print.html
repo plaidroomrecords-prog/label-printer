@@ -7,9 +7,15 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #f0f0f0; font-family: -apple-system, sans-serif; padding: 24px; }
     h1 { font-size: 18px; margin-bottom: 8px; }
-    #status { font-size: 13px; margin-bottom: 16px; color: #333; }
+    #status { font-size: 13px; margin-bottom: 8px; color: #333; }
     #status.error { color: red; }
     #status.ok { color: #007155; }
+    #cert-help {
+      display: none; font-size: 13px; margin-bottom: 16px;
+      background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 10px 14px;
+      line-height: 1.6;
+    }
+    #cert-help a { color: #007155; font-weight: 600; }
     .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
     select { padding: 8px 12px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; background: white; }
     button { padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
@@ -24,6 +30,12 @@
 <body>
 <h1>Plaid Room Records — Label Printer</h1>
 <div id="status">Connecting to DYMO service…</div>
+<div id="cert-help">
+  ⚠️ Could not reach the DYMO service. If this is your first time on this computer, you need to trust the DYMO certificate once:<br>
+  1. <a href="https://127.0.0.1:41951" target="_blank">Click here to open the DYMO service</a><br>
+  2. Click <strong>Advanced → Proceed</strong> (Chrome) or <strong>Visit Website</strong> (Safari) to accept the certificate<br>
+  3. Come back here and <a href="javascript:location.reload()">refresh this page</a>
+</div>
 <div id="debug"></div>
 <div class="controls">
   <select id="printer-select"><option>Loading printers…</option></select>
@@ -32,9 +44,10 @@
 <div id="label-list"></div>
 
 <script>
-const DYMO_HOST = 'http://localhost:7788';
+const DYMO_HOST = 'https://127.0.0.1:41951';
 const statusEl = document.getElementById('status');
 const debugEl  = document.getElementById('debug');
+const certHelp = document.getElementById('cert-help');
 const printerSelect = document.getElementById('printer-select');
 const printBtn = document.getElementById('print-btn');
 
@@ -48,15 +61,12 @@ try { items = JSON.parse(decodeURIComponent(params.get('labels') || '[]')); } ca
 
 document.getElementById('label-list').innerHTML = items.map(item => `
   <div class="label-item">
-    <div><div class="title">${esc(item.title)}</div><div class="meta">${esc(item.sku)} · ${esc(item.barcode)}</div></div>
+    <div><div class="title">${esc(item.title)}</div><div class="meta">${esc(item.sku)} &middot; ${esc(item.barcode)}</div></div>
     <div style="font-size:16px;font-weight:700;">${esc(item.price)}</div>
   </div>`).join('');
 
 async function dymoGet(path) {
-  const r = await fetch(DYMO_HOST + path, {
-    method: 'GET',
-    headers: { 'Content-Type': 'text/xml' },
-  });
+  const r = await fetch(DYMO_HOST + path, { method: 'GET' });
   return r.text();
 }
 
@@ -70,29 +80,23 @@ async function dymoPost(path, bodyParams) {
   return r.text();
 }
 
-// Parse printer names from DYMO XML response
 function parsePrinters(xml) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, 'text/xml');
   return Array.from(doc.querySelectorAll('LabelWriterPrinter')).map(p => ({
     name: p.querySelector('Name')?.textContent || '',
-    type: 'LabelWriterPrinter',
   }));
 }
 
-// Set a variable field value in the label XML string
 function setLabelField(xml, fieldName, value) {
-  // Replace the variable object's text node
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, 'text/xml');
   const objs = doc.querySelectorAll('ObjectInfo');
   for (const obj of objs) {
     const nameEl = obj.querySelector('Name');
     if (!nameEl || nameEl.textContent !== fieldName) continue;
-    // Barcode object
     const textEl = obj.querySelector('BarcodeObject > Text');
     if (textEl) { textEl.textContent = value; continue; }
-    // Text object
     const strEl = obj.querySelector('TextObject StyledText Element String');
     if (strEl) { strEl.textContent = value; }
   }
@@ -100,15 +104,14 @@ function setLabelField(xml, fieldName, value) {
 }
 
 window.addEventListener('load', async () => {
-  // Step 1: get printers
   let printersXml;
   try {
-    printersXml = await dymoGet('/dymo-api/DYMO/DLS/Printing/GetPrinters');
+    printersXml = await dymoGet('/DYMO/DLS/Printing/GetPrinters');
     dbg('GetPrinters response length: ' + printersXml.length);
-    dbg(printersXml.slice(0, 500));
   } catch(e) {
     statusEl.className = 'error';
-    statusEl.textContent = 'Cannot reach DYMO service at port 41951: ' + e.message;
+    statusEl.textContent = 'Cannot reach DYMO service — see instructions below.';
+    certHelp.style.display = 'block';
     dbg('fetch error: ' + e);
     return;
   }
@@ -118,7 +121,7 @@ window.addEventListener('load', async () => {
 
   if (printers.length === 0) {
     statusEl.className = 'error';
-    statusEl.textContent = 'No LabelWriter printers found. See debug info below.';
+    statusEl.textContent = 'No LabelWriter printers found. Make sure DYMO Connect is running and the printer is plugged in.';
     return;
   }
 
@@ -128,7 +131,6 @@ window.addEventListener('load', async () => {
   statusEl.className = 'ok';
   statusEl.textContent = `Ready — ${items.length} label${items.length === 1 ? '' : 's'} queued`;
 
-  // Step 2: load label template
   let labelXml;
   try {
     const resp = await fetch('./plaid-room.label');
@@ -136,7 +138,7 @@ window.addEventListener('load', async () => {
     dbg('Label template loaded: ' + labelXml.length + ' bytes');
   } catch(e) {
     statusEl.className = 'error';
-    statusEl.textContent = 'Could not load plaid-room.label: ' + e.message;
+    statusEl.textContent = 'Could not load label template: ' + e.message;
     return;
   }
 
@@ -151,7 +153,7 @@ window.addEventListener('load', async () => {
         xml = setLabelField(xml, 'product_title', String(item.title || ''));
         xml = setLabelField(xml, 'sku', String(item.sku || ''));
         xml = setLabelField(xml, 'price', String(item.price || ''));
-        const result = await dymoPost('/dymo-api/DYMO/DLS/Printing/PrintLabel', {
+        const result = await dymoPost('/DYMO/DLS/Printing/PrintLabel', {
           printerName,
           printParamsXml: '<LabelWriterPrintParams><Copies>1</Copies></LabelWriterPrintParams>',
           labelXml: xml,
