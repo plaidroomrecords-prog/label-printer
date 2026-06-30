@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>Plaid Room Records — Print Labels</title>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/barcodes/JsBarcode.code128.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #f0f0f0; font-family: -apple-system, sans-serif; padding: 24px; }
+    body { background: #f0f0f0; font-family: Futura, 'Century Gothic', 'Trebuchet MS', sans-serif; padding: 20px; }
     h1 { font-size: 18px; margin-bottom: 8px; }
-    #status { font-size: 13px; margin-bottom: 8px; color: #333; }
+    #status { font-size: 13px; color: #333; margin-bottom: 8px; }
     #status.error { color: red; }
     #status.ok { color: #007155; }
     #cert-help {
@@ -17,62 +16,88 @@
       line-height: 1.8;
     }
     #cert-help a { color: #007155; font-weight: 600; }
-    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; margin-top: 12px; }
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 12px 0 20px; }
     select { padding: 8px 12px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; background: white; }
     button { padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
     #print-btn { background: #000; color: #fff; }
     #print-btn:disabled { background: #999; cursor: not-allowed; }
 
-    /* Label preview: 30252 Address landscape = 3.5" × 1.125" → render at 560×180px */
-    .label-wrap { margin-bottom: 12px; }
-    .label-preview {
-      width: 560px;
-      height: 180px;
+    .label {
+      width: 3.5in;
+      height: 1.125in;
       background: white;
-      border: 1px solid #bbb;
-      border-radius: 3px;
-      position: relative;
+      border: 1px solid #ccc;
+      display: flex;
+      flex-direction: column;
+      padding: 0.12in 0.23in 0.10in 0.23in;
+      margin-bottom: 12px;
       overflow: hidden;
-      font-family: 'Futura', 'Century Gothic', 'Trebuchet MS', sans-serif;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
     }
-    /* Map twip coords to px: scaleX = 560/5040 ≈ 0.1111, scaleY = 180/1581 ≈ 0.1139 */
-    .lp-title {
-      position: absolute;
-      left: 37px; top: 19px; width: 494px; height: 51px;
-      font-size: 12px; font-weight: 700;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      display: flex; align-items: center;
+    .label-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-shrink: 0;
     }
-    .lp-sku {
-      position: absolute;
-      left: 37px; top: 43px; width: 494px; height: 54px;
-      font-size: 9px; color: #444;
-      display: flex; align-items: center;
+    .label-text-block { flex: 1; min-width: 0; padding-right: 4px; }
+    .label-title {
+      font-size: 8.5pt;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
     }
-    .lp-barcode {
-      position: absolute;
-      left: 37px; top: 94px; width: 288px; height: 76px;
-      display: flex; align-items: center;
+    .label-sku {
+      font-size: 6.5pt;
+      color: #333;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+      margin-top: 1px;
     }
-    .lp-barcode svg { max-width: 288px; max-height: 76px; }
-    .lp-logo {
-      position: absolute;
-      left: 320px; top: 82px; width: 95px; height: 77px;
-      display: flex; align-items: center; justify-content: center;
+    .label-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-top: auto;
     }
-    .lp-logo img { max-width: 95px; max-height: 77px; object-fit: contain; }
-    .lp-price {
-      position: absolute;
-      left: 411px; top: 93px; width: 127px; height: 51px;
-      font-size: 16px; font-weight: 700;
-      display: flex; align-items: center; justify-content: flex-end;
-      padding-right: 6px;
+    .label-barcode-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-left: 0.18in;
+    }
+    .label-barcode-area img { display: block; }
+    .label-barcode-number {
+      font-size: 6pt;
+      margin-top: 1px;
+      text-align: center;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .label-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-bottom: 2px;
+      flex-shrink: 0;
+    }
+    .label-logo {
+      width: 0.52in;
+      height: 0.52in;
+      object-fit: contain;
+    }
+    .label-price {
+      font-size: 15pt;
+      font-weight: normal;
+      text-align: right;
+      line-height: 1;
     }
   </style>
 </head>
 <body>
-<h1>Plaid Room Records — Label Printer <span style="font-size:11px;color:#999;float:right;">v11</span></h1>
+<h1>Plaid Room Records — Label Printer <span style="font-size:11px;color:#999;float:right;">v12</span></h1>
 <div id="status">Connecting to DYMO service…</div>
 <div id="cert-help">
   ⚠️ Cannot reach the DYMO service. Make sure:<br>
@@ -97,37 +122,110 @@ const printBtn = document.getElementById('print-btn');
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function dbg(...args) { if (DEBUG) console.log('[label-printer]', ...args); }
 
+// --- Code128B barcode encoder (no external dependency) ---
+const CODE128B_PATTERNS = [
+  0b11011001100,0b11001101100,0b11001100110,0b10010011000,
+  0b10010001100,0b10001001100,0b10011001000,0b10011000100,
+  0b10001100100,0b11001001000,0b11001000100,0b11000100100,
+  0b10110011100,0b10011011100,0b10011001110,0b10111001100,
+  0b10011101100,0b10011100110,0b11001110010,0b11001011100,
+  0b11001001110,0b11011100100,0b11001110100,0b11101101110,
+  0b11101001100,0b11100101100,0b11100100110,0b11101100100,
+  0b11100110100,0b11100110010,0b11011011000,0b11011000110,
+  0b11000110110,0b10100011000,0b10001011000,0b10001000110,
+  0b10110001000,0b10001101000,0b10001100010,0b11010001000,
+  0b11000101000,0b11000100010,0b10110111000,0b10110001110,
+  0b10001101110,0b10111011000,0b10111000110,0b10001110110,
+  0b11101110110,0b11010001110,0b11000101110,0b11011101000,
+  0b11011100010,0b11011101110,0b11101011000,0b11101000110,
+  0b11100010110,0b11101101000,0b11101100010,0b11100011010,
+  0b11101111010,0b11001000010,0b11110001010,0b10100110000,
+  0b10100001100,0b10010110000,0b10010000110,0b10000101100,
+  0b10000100110,0b10110010000,0b10110000100,0b10011010000,
+  0b10011000010,0b10000110100,0b10000110010,0b11000010010,
+  0b11001010000,0b11110111010,0b11000010100,0b10001111010,
+  0b10100111100,0b10010111100,0b10010011110,0b10111100100,
+  0b10011110100,0b10011110010,0b11110100100,0b11110010100,
+  0b11110010010,0b11011011110,0b11011110110,0b11110110110,
+  0b10101111000,0b10100011110,0b10001011110,
+];
+const START_B  = 0b11010010000;
+const STOP_PAT = 0b1100011101011;
+
+function encodeCode128B(text) {
+  const chars = [];
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c < 32 || c > 126) return null;
+    chars.push(c - 32);
+  }
+  let check = 104;
+  for (let i = 0; i < chars.length; i++) check += chars[i] * (i + 1);
+  check %= 103;
+  const syms = [START_B, ...chars.map(c => CODE128B_PATTERNS[c]), CODE128B_PATTERNS[check]];
+  const bars = [];
+  for (const s of syms) for (let b = 10; b >= 0; b--) bars.push((s >> b) & 1);
+  for (let b = 12; b >= 0; b--) bars.push((STOP_PAT >> b) & 1);
+  bars.push(1); bars.push(1);
+  return bars;
+}
+
+function buildBarcodeDataURL(text, widthPx, heightPx) {
+  const bars = encodeCode128B(text);
+  if (!bars) return null;
+  const canvas = document.createElement('canvas');
+  const scale = 3;
+  canvas.width = widthPx * scale;
+  canvas.height = heightPx * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'black';
+  const barWidth = (widthPx * scale) / bars.length;
+  for (let i = 0; i < bars.length; i++) {
+    if (bars[i]) {
+      const x = Math.round(i * barWidth);
+      const nextX = Math.round((i + 1) * barWidth);
+      ctx.fillRect(x, 0, nextX - x, canvas.height);
+    }
+  }
+  return canvas.toDataURL('image/png');
+}
+
+// --- Label HTML rendering ---
+function renderLabel(item) {
+  const barcodeDataURL = buildBarcodeDataURL(item.barcode, 125, 26);
+  const barcodeImg = barcodeDataURL
+    ? `<img src="${barcodeDataURL}" width="125" height="26" style="display:block;image-rendering:pixelated;">`
+    : '';
+  return `
+    <div class="label">
+      <div class="label-top">
+        <div class="label-text-block">
+          <div class="label-title">${esc(item.title || '')}</div>
+          <div class="label-sku">${esc(item.sku || '')}</div>
+        </div>
+      </div>
+      <div class="label-bottom">
+        <div class="label-barcode-area">
+          ${barcodeImg}
+          <div class="label-barcode-number">${esc(item.barcode.toUpperCase())}</div>
+        </div>
+        <div class="label-right">
+          <img class="label-logo" src="./logo.png" alt="Plaid Room Records">
+          <div class="label-price">${esc(item.price || '')}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
 const params = new URLSearchParams(window.location.search);
 let items = [];
 try { items = JSON.parse(decodeURIComponent(params.get('labels') || '[]')); } catch(e) {}
 
-const listEl = document.getElementById('label-list');
-listEl.innerHTML = items.map((item, i) => `
-  <div class="label-wrap">
-    <div class="label-preview" id="lp-${i}">
-      <div class="lp-title">${esc(item.title)}</div>
-      <div class="lp-sku">${esc(item.sku)}</div>
-      <div class="lp-barcode"><svg id="bc-${i}"></svg></div>
-      <div class="lp-logo"><img src="./logo.png" alt="Plaid Room Records"></div>
-      <div class="lp-price">${esc(item.price)}</div>
-    </div>
-  </div>`).join('');
+document.getElementById('label-list').innerHTML = items.map(renderLabel).join('');
 
-items.forEach((item, i) => {
-  try {
-    JsBarcode(`#bc-${i}`, item.barcode, {
-      format: 'CODE128',
-      width: 1,
-      height: 48,
-      displayValue: true,
-      fontSize: 8,
-      margin: 0,
-    });
-  } catch(e) {
-    dbg('barcode render error', item.barcode, e);
-  }
-});
-
+// --- DYMO Connect printing ---
 function setLabelField(xml, fieldName, value) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, 'text/xml');
@@ -194,21 +292,6 @@ window.addEventListener('load', async () => {
   }
 
   const filledXmls = items.map(item => buildLabelXml(labelXml, item));
-
-  // Probe render-label in debug mode so we can see the real response format
-  if (DEBUG && filledXmls.length > 0) {
-    try {
-      const r = await fetch(DYMO_HOST + '/dcd/api/render-label', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ printerName: printerSelect.value, labelXml: filledXmls[0] }),
-      });
-      const raw = await r.text();
-      console.log('[render-label raw]', raw.slice(0, 500));
-    } catch(e) {
-      console.log('[render-label error]', e);
-    }
-  }
 
   printBtn.addEventListener('click', async () => {
     printBtn.disabled = true;
