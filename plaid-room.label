@@ -26,7 +26,7 @@
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="0" Right="0" Top="0" Bottom="0"/>
     </BarcodeObject>
-    <Bounds X="331.2" Y="823.9243" Width="2594.864" Height="668.8757"/>
+    <Bounds X="331.2" Y="823.9243" Width="2850" Height="700"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
