@@ -72,7 +72,7 @@
   </style>
 </head>
 <body>
-<h1>Plaid Room Records — Label Printer <span style="font-size:11px;color:#999;float:right;">v10</span></h1>
+<h1>Plaid Room Records — Label Printer <span style="font-size:11px;color:#999;float:right;">v11</span></h1>
 <div id="status">Connecting to DYMO service…</div>
 <div id="cert-help">
   ⚠️ Cannot reach the DYMO service. Make sure:<br>
@@ -194,6 +194,21 @@ window.addEventListener('load', async () => {
   }
 
   const filledXmls = items.map(item => buildLabelXml(labelXml, item));
+
+  // Probe render-label in debug mode so we can see the real response format
+  if (DEBUG && filledXmls.length > 0) {
+    try {
+      const r = await fetch(DYMO_HOST + '/dcd/api/render-label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ printerName: printerSelect.value, labelXml: filledXmls[0] }),
+      });
+      const raw = await r.text();
+      console.log('[render-label raw]', raw.slice(0, 500));
+    } catch(e) {
+      console.log('[render-label error]', e);
+    }
+  }
 
   printBtn.addEventListener('click', async () => {
     printBtn.disabled = true;
