@@ -17,7 +17,7 @@
       <IsVariable>True</IsVariable>
       <Text>123456</Text>
       <Type>Code128Auto</Type>
-      <Size>Large</Size>
+      <Size>Medium</Size>
       <TextPosition>Bottom</TextPosition>
       <TextFont Family="Futura" Size="7" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
       <CheckSumFont Family="Arial" Size="7.3125" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
