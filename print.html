@@ -23,61 +23,55 @@
     #print-btn { background: #000; color: #fff; }
     #print-btn:disabled { background: #999; cursor: not-allowed; }
 
-    /* Label preview — approximate 3.5" × 1.1" aspect ratio */
+    /* Label preview — 3.5" × 1.1" at ~96dpi = 336 × 106px, scaled up 1.5× */
     .label-item {
       background: white;
       border: 1px solid #ccc;
       border-radius: 4px;
-      margin-bottom: 8px;
-      width: 560px; /* ~3.5" at 160dpi screen approximation */
-      height: 176px;
-      position: relative;
+      margin-bottom: 10px;
+      width: 504px;
+      height: 106px;
       overflow: hidden;
       font-family: 'Futura', 'Century Gothic', 'Trebuchet MS', sans-serif;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      padding: 6px 10px 4px 10px;
+      gap: 2px;
+    }
+    .label-top {
       display: flex;
       flex-direction: column;
-      padding: 10px 12px 6px 12px;
     }
     .label-title {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 340px;
     }
     .label-sku {
-      font-size: 9px;
+      font-size: 8px;
       color: #444;
-      margin-top: 2px;
-      max-width: 340px;
     }
     .label-bottom {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       justify-content: space-between;
-      margin-top: auto;
-    }
-    .label-barcode-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
+      gap: 8px;
     }
     .label-barcode-wrap svg {
       display: block;
     }
     .label-price {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 700;
       white-space: nowrap;
-      padding-bottom: 4px;
     }
     .label-logo {
-      font-size: 8px;
+      font-size: 7px;
       font-weight: 700;
       text-align: center;
       line-height: 1.3;
-      padding-bottom: 4px;
       color: #000;
     }
   </style>
@@ -117,12 +111,12 @@ try { items = JSON.parse(decodeURIComponent(params.get('labels') || '[]')); } ca
 const listEl = document.getElementById('label-list');
 listEl.innerHTML = items.map((item, i) => `
   <div class="label-item">
-    <div class="label-title">${esc(item.title)}</div>
-    <div class="label-sku">${esc(item.sku)}</div>
+    <div class="label-top">
+      <div class="label-title">${esc(item.title)}</div>
+      <div class="label-sku">${esc(item.sku)}</div>
+    </div>
     <div class="label-bottom">
-      <div class="label-barcode-wrap">
-        <svg id="bc-${i}"></svg>
-      </div>
+      <div class="label-barcode-wrap"><svg id="bc-${i}"></svg></div>
       <div class="label-logo">PLAID ROOM<br>RECORDS</div>
       <div class="label-price">${esc(item.price)}</div>
     </div>
@@ -133,10 +127,10 @@ items.forEach((item, i) => {
   try {
     JsBarcode(`#bc-${i}`, item.barcode, {
       format: 'CODE128',
-      width: 1.4,
-      height: 50,
+      width: 1.2,
+      height: 38,
       displayValue: true,
-      fontSize: 9,
+      fontSize: 7,
       margin: 0,
     });
   } catch(e) {
