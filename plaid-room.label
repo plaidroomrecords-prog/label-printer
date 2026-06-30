@@ -17,7 +17,7 @@
       <IsVariable>True</IsVariable>
       <Text>123456</Text>
       <Type>Code128Auto</Type>
-      <Size>Medium</Size>
+      <Size>Small</Size>
       <TextPosition>Bottom</TextPosition>
       <TextFont Family="Futura" Size="7" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
       <CheckSumFont Family="Arial" Size="7.3125" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
@@ -26,7 +26,7 @@
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="0" Right="0" Top="0" Bottom="0"/>
     </BarcodeObject>
-    <Bounds X="331.2" Y="823.9243" Width="3200" Height="720"/>
+    <Bounds X="331.2" Y="823.9243" Width="2594.864" Height="668.8757"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
