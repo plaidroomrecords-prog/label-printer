@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Plaid Room Records — Print Labels</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/barcodes/JsBarcode.code128.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #f0f0f0; font-family: -apple-system, sans-serif; padding: 24px; }
@@ -21,13 +22,57 @@
     button { padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
     #print-btn { background: #000; color: #fff; }
     #print-btn:disabled { background: #999; cursor: not-allowed; }
-    .label-item { background: white; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px; padding: 8px 12px; }
-    .label-item .meta { font-size: 12px; color: #555; }
-    .label-item .meta strong { color: #000; font-size: 13px; }
+
+    /* Label preview: 30252 Address landscape = 3.5" × 1.125" → render at 560×180px */
+    .label-wrap { margin-bottom: 12px; }
+    .label-preview {
+      width: 560px;
+      height: 180px;
+      background: white;
+      border: 1px solid #bbb;
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+      font-family: 'Futura', 'Century Gothic', 'Trebuchet MS', sans-serif;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    /* Map twip coords to px: scaleX = 560/5040 ≈ 0.1111, scaleY = 180/1581 ≈ 0.1139 */
+    .lp-title {
+      position: absolute;
+      left: 37px; top: 19px; width: 494px; height: 51px;
+      font-size: 12px; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: flex; align-items: center;
+    }
+    .lp-sku {
+      position: absolute;
+      left: 37px; top: 43px; width: 494px; height: 54px;
+      font-size: 9px; color: #444;
+      display: flex; align-items: center;
+    }
+    .lp-barcode {
+      position: absolute;
+      left: 37px; top: 94px; width: 288px; height: 76px;
+      display: flex; align-items: center;
+    }
+    .lp-barcode svg { max-width: 288px; max-height: 76px; }
+    .lp-logo {
+      position: absolute;
+      left: 320px; top: 82px; width: 95px; height: 77px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .lp-logo img { max-width: 95px; max-height: 77px; object-fit: contain; }
+    .lp-price {
+      position: absolute;
+      left: 411px; top: 93px; width: 127px; height: 51px;
+      font-size: 16px; font-weight: 700;
+      display: flex; align-items: center; justify-content: flex-end;
+      padding-right: 6px;
+    }
   </style>
 </head>
 <body>
-<h1>Plaid Room Records — Label Printer <span style="font-size:11px;color:#999;float:right;">v9</span></h1>
+<h1>Plaid Room Records — Label Printer <span style="font-size:11px;color:#999;float:right;">v10</span></h1>
 <div id="status">Connecting to DYMO service…</div>
 <div id="cert-help">
   ⚠️ Cannot reach the DYMO service. Make sure:<br>
@@ -58,9 +103,30 @@ try { items = JSON.parse(decodeURIComponent(params.get('labels') || '[]')); } ca
 
 const listEl = document.getElementById('label-list');
 listEl.innerHTML = items.map((item, i) => `
-  <div class="label-item" id="card-${i}">
-    <div class="meta"><strong>${esc(item.title)}</strong> &nbsp;·&nbsp; ${esc(item.sku)} &nbsp;·&nbsp; ${esc(item.price)}</div>
+  <div class="label-wrap">
+    <div class="label-preview" id="lp-${i}">
+      <div class="lp-title">${esc(item.title)}</div>
+      <div class="lp-sku">${esc(item.sku)}</div>
+      <div class="lp-barcode"><svg id="bc-${i}"></svg></div>
+      <div class="lp-logo"><img src="./logo.png" alt="Plaid Room Records"></div>
+      <div class="lp-price">${esc(item.price)}</div>
+    </div>
   </div>`).join('');
+
+items.forEach((item, i) => {
+  try {
+    JsBarcode(`#bc-${i}`, item.barcode, {
+      format: 'CODE128',
+      width: 1,
+      height: 48,
+      displayValue: true,
+      fontSize: 8,
+      margin: 0,
+    });
+  } catch(e) {
+    dbg('barcode render error', item.barcode, e);
+  }
+});
 
 function setLabelField(xml, fieldName, value) {
   const parser = new DOMParser();
@@ -85,9 +151,7 @@ function buildLabelXml(labelXml, item) {
   return xml;
 }
 
-
 window.addEventListener('load', async () => {
-  // Step 1: get printers
   let printers = [];
   try {
     const r = await fetch(DYMO_HOST + '/dcd/api/get-printers');
@@ -118,7 +182,6 @@ window.addEventListener('load', async () => {
   statusEl.className = 'ok';
   statusEl.textContent = `Ready — ${items.length} label${items.length === 1 ? '' : 's'} queued`;
 
-  // Step 2: load label template (no-store to always get latest)
   let labelXml;
   try {
     const resp = await fetch('./plaid-room.label', { cache: 'no-store' });
