@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Plaid Room Records — Print Labels</title>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/barcodes/JsBarcode.code128.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #f0f0f0; font-family: -apple-system, sans-serif; padding: 24px; }
@@ -22,58 +21,18 @@
     button { padding: 10px 20px; font-size: 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
     #print-btn { background: #000; color: #fff; }
     #print-btn:disabled { background: #999; cursor: not-allowed; }
-
-    /* Label preview — 3.5" × 1.1" at ~96dpi = 336 × 106px, scaled up 1.5× */
     .label-item {
       background: white;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
       margin-bottom: 10px;
-      width: 504px;
-      height: 106px;
-      overflow: hidden;
-      font-family: 'Futura', 'Century Gothic', 'Trebuchet MS', sans-serif;
-      display: grid;
-      grid-template-rows: auto 1fr;
-      padding: 6px 10px 4px 10px;
-      gap: 2px;
+      padding: 8px 12px;
     }
-    .label-top {
-      display: flex;
-      flex-direction: column;
-    }
-    .label-title {
-      font-size: 11px;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .label-sku {
-      font-size: 8px;
-      color: #444;
-    }
-    .label-bottom {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    .label-barcode-wrap svg {
-      display: block;
-    }
-    .label-price {
-      font-size: 16px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .label-logo {
-      font-size: 7px;
-      font-weight: 700;
-      text-align: center;
-      line-height: 1.3;
-      color: #000;
-    }
+    .label-item .meta { font-size: 12px; color: #555; margin-bottom: 6px; }
+    .label-item .meta strong { color: #000; font-size: 13px; }
+    .label-preview { line-height: 0; margin-top: 4px; }
+    .label-preview img { border: 1px solid #eee; max-width: 100%; }
+    .label-preview .pending { font-size: 12px; color: #999; font-style: italic; line-height: 1.4; }
   </style>
 </head>
 <body>
@@ -102,47 +61,22 @@ const printBtn = document.getElementById('print-btn');
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function dbg(...args) { if (DEBUG) console.log('[label-printer]', ...args); }
 
-// Parse labels from URL
 const params = new URLSearchParams(window.location.search);
 let items = [];
 try { items = JSON.parse(decodeURIComponent(params.get('labels') || '[]')); } catch(e) {}
 
-// Render label previews
+// Render placeholder label cards (previews filled in after DYMO loads)
 const listEl = document.getElementById('label-list');
 listEl.innerHTML = items.map((item, i) => `
-  <div class="label-item">
-    <div class="label-top">
-      <div class="label-title">${esc(item.title)}</div>
-      <div class="label-sku">${esc(item.sku)}</div>
-    </div>
-    <div class="label-bottom">
-      <div class="label-barcode-wrap"><svg id="bc-${i}"></svg></div>
-      <div class="label-logo">PLAID ROOM<br>RECORDS</div>
-      <div class="label-price">${esc(item.price)}</div>
-    </div>
+  <div class="label-item" id="card-${i}">
+    <div class="meta"><strong>${esc(item.title)}</strong> &nbsp;·&nbsp; ${esc(item.sku)} &nbsp;·&nbsp; ${esc(item.price)}</div>
+    <div class="label-preview" id="preview-${i}"><span class="pending">Loading preview…</span></div>
   </div>`).join('');
-
-// Render barcodes after DOM is ready
-items.forEach((item, i) => {
-  try {
-    JsBarcode(`#bc-${i}`, item.barcode, {
-      format: 'CODE128',
-      width: 1.2,
-      height: 38,
-      displayValue: true,
-      fontSize: 7,
-      margin: 0,
-    });
-  } catch(e) {
-    dbg('barcode render error', item.barcode, e);
-  }
-});
 
 function setLabelField(xml, fieldName, value) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, 'text/xml');
-  const objs = doc.querySelectorAll('ObjectInfo');
-  for (const obj of objs) {
+  for (const obj of doc.querySelectorAll('ObjectInfo')) {
     const nameEl = obj.querySelector('Name');
     if (!nameEl || nameEl.textContent !== fieldName) continue;
     const textEl = obj.querySelector('BarcodeObject > Text');
@@ -151,6 +85,39 @@ function setLabelField(xml, fieldName, value) {
     if (strEl) { strEl.textContent = value; }
   }
   return new XMLSerializer().serializeToString(doc);
+}
+
+function buildLabelXml(labelXml, item) {
+  let xml = labelXml;
+  xml = setLabelField(xml, 'barcode', String(item.barcode));
+  xml = setLabelField(xml, 'product_title', String(item.title || ''));
+  xml = setLabelField(xml, 'sku', String(item.sku || ''));
+  xml = setLabelField(xml, 'price', String(item.price || ''));
+  return xml;
+}
+
+async function renderPreview(labelXml, printerName, index) {
+  try {
+    const r = await fetch(DYMO_HOST + '/dcd/api/render-label', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        printerName,
+        labelXml,
+        renderParamsXml: '<LabelWriterRenderParams><SizeMode>FixedSize</SizeMode><Width>560</Width><Height>176</Height><HorizontalResolution>300</HorizontalResolution><VerticalResolution>300</VerticalResolution></LabelWriterRenderParams>',
+      }),
+    });
+    const result = await r.json();
+    dbg('render-label', index, result);
+    if (result.status && result.responseValue) {
+      const el = document.getElementById(`preview-${index}`);
+      if (el) el.innerHTML = `<img src="data:image/png;base64,${result.responseValue}" alt="label preview">`;
+    }
+  } catch(e) {
+    dbg('render error', index, e);
+    const el = document.getElementById(`preview-${index}`);
+    if (el) el.innerHTML = `<span class="pending">Preview unavailable</span>`;
+  }
 }
 
 window.addEventListener('load', async () => {
@@ -185,10 +152,10 @@ window.addEventListener('load', async () => {
   statusEl.className = 'ok';
   statusEl.textContent = `Ready — ${items.length} label${items.length === 1 ? '' : 's'} queued`;
 
-  // Step 2: load label template
+  // Step 2: load label template (no-store to always get latest)
   let labelXml;
   try {
-    const resp = await fetch('./plaid-room.label');
+    const resp = await fetch('./plaid-room.label', { cache: 'no-store' });
     labelXml = await resp.text();
     dbg('label template loaded', labelXml.length, 'bytes');
   } catch(e) {
@@ -197,35 +164,44 @@ window.addEventListener('load', async () => {
     return;
   }
 
+  // Step 3: render previews using DYMO's actual renderer
+  const printerName = printerSelect.value;
+  const filledXmls = items.map(item => buildLabelXml(labelXml, item));
+  filledXmls.forEach((xml, i) => renderPreview(xml, printerName, i));
+
+  // Re-render previews if printer selection changes
+  printerSelect.addEventListener('change', () => {
+    const name = printerSelect.value;
+    filledXmls.forEach((xml, i) => {
+      const el = document.getElementById(`preview-${i}`);
+      if (el) el.innerHTML = `<span class="pending">Loading preview…</span>`;
+      renderPreview(xml, name, i);
+    });
+  });
+
   printBtn.addEventListener('click', async () => {
-    const printerName = printerSelect.value;
     printBtn.disabled = true;
     printBtn.textContent = 'Printing…';
+    const name = printerSelect.value;
     let printed = 0;
     try {
-      for (const item of items) {
-        let xml = labelXml;
-        xml = setLabelField(xml, 'barcode', String(item.barcode));
-        xml = setLabelField(xml, 'product_title', String(item.title || ''));
-        xml = setLabelField(xml, 'sku', String(item.sku || ''));
-        xml = setLabelField(xml, 'price', String(item.price || ''));
-
+      for (const xml of filledXmls) {
         const r = await fetch(DYMO_HOST + '/dcd/api/print-label', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            printerName,
+            printerName: name,
             printParamsXml: '<LabelWriterPrintParams><Copies>1</Copies></LabelWriterPrintParams>',
             labelXml: xml,
             labelSetXml: '<LabelSet></LabelSet>',
           }),
         });
         const result = await r.json();
-        dbg('print result', result);
+        dbg('print result status', result.status);
         if (!result.status) throw new Error(result.error || 'Print failed');
         printed++;
       }
-      statusEl.textContent = `✓ Sent ${printed} label${printed === 1 ? '' : 's'} to ${printerName}`;
+      statusEl.textContent = `✓ Sent ${printed} label${printed === 1 ? '' : 's'} to ${name}`;
       statusEl.className = 'ok';
     } catch(e) {
       statusEl.className = 'error';
