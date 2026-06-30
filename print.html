@@ -97,7 +97,7 @@
   </style>
 </head>
 <body>
-<h1>Plaid Room Records — Label Printer <span style="font-size:11px;color:#999;float:right;">v12</span></h1>
+<h1>Plaid Room Records — Label Printer <span style="font-size:11px;color:#999;float:right;">v13</span></h1>
 <div id="status">Connecting to DYMO service…</div>
 <div id="cert-help">
   ⚠️ Cannot reach the DYMO service. Make sure:<br>
@@ -219,9 +219,14 @@ function renderLabel(item) {
     </div>`;
 }
 
-const params = new URLSearchParams(window.location.search);
+// Support both hash (#labels=...) and query (?labels=...) — hash avoids server URL length limits
 let items = [];
-try { items = JSON.parse(decodeURIComponent(params.get('labels') || '[]')); } catch(e) {}
+try {
+  const hash = window.location.hash.slice(1);
+  const query = window.location.search.slice(1);
+  const raw = new URLSearchParams(hash).get('labels') || new URLSearchParams(query).get('labels') || '[]';
+  items = JSON.parse(decodeURIComponent(raw));
+} catch(e) {}
 
 document.getElementById('label-list').innerHTML = items.map(renderLabel).join('');
 
@@ -291,31 +296,40 @@ window.addEventListener('load', async () => {
     return;
   }
 
-  const filledXmls = items.map(item => buildLabelXml(labelXml, item));
+  // Use first label as the template; encode remaining as LabelSet records
+  // so the entire batch is one print job (no hiccup between labels)
+  const firstXml = buildLabelXml(labelXml, items[0]);
+  const labelSetXml = items.length <= 1 ? '<LabelSet></LabelSet>' : [
+    '<LabelSet>',
+    ...items.slice(1).map(item => `
+      <LabelRecord>
+        <ObjectData Name="barcode"><![CDATA[${item.barcode}]]></ObjectData>
+        <ObjectData Name="product_title"><![CDATA[${item.title || ''}]]></ObjectData>
+        <ObjectData Name="sku"><![CDATA[${item.sku || ''}]]></ObjectData>
+        <ObjectData Name="price"><![CDATA[${item.price || ''}]]></ObjectData>
+      </LabelRecord>`),
+    '</LabelSet>',
+  ].join('');
 
   printBtn.addEventListener('click', async () => {
     printBtn.disabled = true;
     printBtn.textContent = 'Printing…';
     const name = printerSelect.value;
-    let printed = 0;
     try {
-      for (const xml of filledXmls) {
-        const r = await fetch(DYMO_HOST + '/dcd/api/print-label', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            printerName: name,
-            printParamsXml: '<LabelWriterPrintParams><Copies>1</Copies></LabelWriterPrintParams>',
-            labelXml: xml,
-            labelSetXml: '<LabelSet></LabelSet>',
-          }),
-        });
-        const result = await r.json();
-        dbg('print result status', result.status);
-        if (!result.status) throw new Error(result.error || 'Print failed');
-        printed++;
-      }
-      statusEl.textContent = `✓ Sent ${printed} label${printed === 1 ? '' : 's'} to ${name}`;
+      const r = await fetch(DYMO_HOST + '/dcd/api/print-label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          printerName: name,
+          printParamsXml: '<LabelWriterPrintParams><Copies>1</Copies></LabelWriterPrintParams>',
+          labelXml: firstXml,
+          labelSetXml,
+        }),
+      });
+      const result = await r.json();
+      dbg('print result', result);
+      if (!result.status) throw new Error(result.error || 'Print failed');
+      statusEl.textContent = `✓ Sent ${items.length} label${items.length === 1 ? '' : 's'} to ${name}`;
       statusEl.className = 'ok';
     } catch(e) {
       statusEl.className = 'error';
